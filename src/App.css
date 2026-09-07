@@ -1,0 +1,35 @@
+/* App.css - Clear default Vite styles */
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Ensure hero is proper responsive on mobile */
+@media (max-width: 768px) {
+  .hero-section > .container > div {
+    grid-template-columns: 1fr !important;
+    gap: 2rem !important;
+    padding-top: 2rem !important;
+  }
+  .hero-img-wrapper img {
+    max-width: 100% !important;
+    width: 100% !important;
+    height: 280px !important;
+  }
+  .hero-stats {
+    flex-wrap: wrap;
+  }
+  .auth-wrapper {
+    grid-template-columns: 1fr !important;
+  }
+  .admin-content {
+    margin-left: 0 !important;
+    padding: 1rem !important;
+  }
+  .cake-builder {
+    grid-template-columns: 1fr !important;
+  }
+  .cake-canvas {
+    position: static !important;
+  }
+}
