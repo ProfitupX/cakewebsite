@@ -23,12 +23,12 @@ export default function AdminSidebar() {
     <>
       <div className="sidebar-logo">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>🎂 SmartBaking</span>
+          <span>🎂 Sowmis Cake</span>
           <button onClick={() => setMobileOpen(false)} style={{ background: 'none', color: 'rgba(255,255,255,0.5)', display: 'none' }} className="sidebar-close">
             <X size={20} />
           </button>
         </div>
-        <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginTop: '0.25rem' }}>Admin Panel</div>
+        <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginTop: '0.25rem' }}>Smart Kitchen & Admin</div>
       </div>
 
       <nav className="sidebar-nav">

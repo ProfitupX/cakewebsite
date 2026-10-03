@@ -33,10 +33,10 @@ export default function AuthPage() {
         <div style={{ position: 'absolute', inset: 0, opacity: 0.05, backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
         <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8 }} style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
           <div style={{ fontSize: '5rem', marginBottom: '1.5rem' }}>🎂</div>
-          <h1 style={{ color: 'white', marginBottom: '1rem', fontSize: '2.5rem' }}>SmartBaking</h1>
+          <h1 style={{ color: 'white', marginBottom: '1rem', fontSize: '2.5rem' }}>Sowmis Cake</h1>
           <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '1.1rem', lineHeight: 1.7, maxWidth: 320 }}>Crafting extraordinary cakes with love, passion and the finest ingredients.</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '3rem' }}>
-            {['🎂 Custom Cakes', '⚡ Happy Hours', '📊 Live Tracking', '💌 Reviews'].map(f => (
+            {['🎂 3D Custom Cakes', '⚡ Happy Hours', '📊 AI Kitchen Predictor', '💌 Real Reviews'].map(f => (
               <div key={f} style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 12, padding: '0.75rem', fontSize: '0.9rem', color: 'rgba(255,255,255,0.85)' }}>{f}</div>
             ))}
           </div>
@@ -49,7 +49,7 @@ export default function AuthPage() {
           <div style={{ marginBottom: '2rem' }}>
             <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '2rem' }}>← Back to Home</Link>
             <h2 style={{ fontFamily: 'Playfair Display, serif', color: 'var(--chocolate)', marginBottom: '0.5rem' }}>{tab === 'signin' ? 'Welcome Back!' : 'Create Account'}</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{tab === 'signin' ? 'Sign in to your SmartBaking account' : 'Join thousands of cake lovers'}</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{tab === 'signin' ? 'Sign in to your Sowmis Cake account' : 'Join thousands of cake lovers'}</p>
           </div>
 
           <div className="auth-tabs">

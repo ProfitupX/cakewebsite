@@ -147,6 +147,56 @@ export interface InventoryAlert {
   created_at: string;
 }
 
+// ─── AI Cake Calculations ──────────────────────────────────────────────────
+export interface AIIngredientRequirement {
+  name: string;
+  amount: number;
+  unit: string;
+  inventory_match: string; // matches inventory item name in DB
+  cost_estimate: number;
+}
+
+export interface AIBakingSpecs {
+  temp_celsius: number;
+  bake_time_mins: number;
+  prep_time_mins: number;
+  cooling_time_mins: number;
+}
+
+export interface AICostEstimate {
+  ingredient_cost: number;
+  labor_overhead: number;
+  suggested_price: number;
+  profit_margin_pct: number;
+}
+
+export interface AICakeCalculation {
+  cake_name: string;
+  weight_kg: number;
+  tiers: number;
+  flavor: string;
+  frosting: string;
+  topping: string;
+  ingredients: AIIngredientRequirement[];
+  baking_specs: AIBakingSpecs;
+  cost_estimate: AICostEstimate;
+  baker_tips: string[];
+  total_flour_kg: number;
+  total_sugar_kg: number;
+  total_butter_kg: number;
+  total_eggs_count: number;
+  total_milk_l: number;
+  total_cocoa_kg: number;
+  ai_generated_at: string;
+}
+
+export interface AIDemandForecastInsight {
+  summary: string;
+  top_demanded_cakes: Array<{ name: string; predicted_units: number; trend: 'up' | 'down' | 'stable' }>;
+  restock_urgency: Array<{ ingredient: string; current: number; needed: number; unit: string; priority: 'HIGH' | 'MEDIUM' | 'LOW' }>;
+  baker_recommendation: string;
+}
+
 // ─── Dashboard KPIs ──────────────────────────────────────────────────────────
 export interface DashboardKPIs {
   totalRevenue: number;

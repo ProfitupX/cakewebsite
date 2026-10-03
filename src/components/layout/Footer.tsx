@@ -8,9 +8,9 @@ export default function Footer() {
       <div className="container">
         <div className="footer-grid">
           <div>
-            <div className="footer-logo">🎂 SmartBaking</div>
+            <div className="footer-logo">🎂 Sowmis Cake</div>
             <p className="footer-desc">
-              Crafting extraordinary cakes with love, passion and the finest ingredients.
+              Crafting extraordinary luxury cakes with love, passion and the finest ingredients.
               Every bite tells a story of artisan excellence.
             </p>
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
@@ -52,17 +52,17 @@ export default function Footer() {
                 <Phone size={14} /><span>+91 98765 43210</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', opacity: 0.7 }}>
-                <Mail size={14} /><span>hello@smartbaking.in</span>
+                <Mail size={14} /><span>order@sowmiscake.com</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', opacity: 0.7 }}>
-                <MapPin size={14} /><span>Baker Street, Mumbai</span>
+                <MapPin size={14} /><span>Sowmis Cake Studio, Mumbai</span>
               </div>
             </div>
           </div>
         </div>
 
         <div className="footer-bottom">
-          <span>© 2024 SmartBaking. All rights reserved.</span>
+          <span>© 2026 Sowmis Cake. All rights reserved.</span>
           <div style={{ display: 'flex', gap: '1.5rem' }}>
             <a href="#" className="footer-link">Privacy Policy</a>
             <a href="#" className="footer-link">Terms</a>

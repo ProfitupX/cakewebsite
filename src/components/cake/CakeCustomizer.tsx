@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import CakeVisualizer from './CakeVisualizer';
+import AICakeCalculator from './AICakeCalculator';
 import { calculateCakePrice } from '../../utils/pricingUtils';
 import type { CakeCustomization, CakeFlavor, CakeTier, CakeTopping, CakeFrosting, CakeSize } from '../../types';
 import { useCart } from '../../context/CartContext';
@@ -120,6 +121,11 @@ export default function CakeCustomizer({ happyHourDiscount = 0, onComplete }: Ca
           {happyHourDiscount > 0 && (
             <span className="badge badge-rose">⚡ {happyHourDiscount}% OFF</span>
           )}
+        </div>
+
+        {/* AI Recipe & Kitchen Deduction Calculator */}
+        <div style={{ width: '100%', marginTop: '1.25rem' }}>
+          <AICakeCalculator customization={{ ...customization, message }} />
         </div>
       </div>
 

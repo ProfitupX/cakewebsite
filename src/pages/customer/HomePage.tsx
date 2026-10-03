@@ -93,13 +93,13 @@ export default function HomePage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
             {/* Left */}
             <motion.div initial="hidden" animate="visible" variants={fadeIn} transition={{ duration: 0.7 }}>
-              <div className="hero-tag">🌟 India's Premier Artisan Bakery</div>
+              <div className="hero-tag">🎂 Welcome to Sowmis Cake — Luxury Artisan Bakery</div>
               <h1 className="hero-title">
                 Bake More Than
                 <span style={{ color: '#FF8FAB' }}>Memories</span>
               </h1>
               <p className="hero-desc">
-                Handcrafted luxury cakes with premium ingredients. Design your dream cake, track it live, and savor every moment.
+                Handcrafted luxury cakes baked with love & AI smart precision. Design your dream 3D cake, track it live, and savor every bite.
               </p>
               <div className="hero-actions">
                 <Link to="/custom-order" className="btn btn-primary btn-lg">
