@@ -9,6 +9,8 @@ export default function CheckoutPage() {
   const { items, subtotal, clearCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [name, setName] = useState(user?.user_metadata?.full_name || '');
+  const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
   const [placing, setPlacing] = useState(false);
@@ -27,8 +29,19 @@ export default function CheckoutPage() {
         quantity: item.quantity,
         unit_price: item.unit_price,
         is_custom: item.is_custom,
+        product: item.product,
       }));
-      const order = await createOrder(user?.id || null, orderItems, total, 0, notes, undefined);
+      const order = await createOrder(
+        user?.id || null,
+        orderItems,
+        total,
+        0,
+        notes,
+        undefined,
+        address,
+        name,
+        phone
+      );
       setOrderId(order.id);
       clearCart();
       setOrdered(true);
@@ -65,14 +78,24 @@ export default function CheckoutPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '2rem', alignItems: 'start' }}>
           <form onSubmit={handlePlaceOrder}>
             <div style={{ background: 'white', borderRadius: 'var(--radius-xl)', padding: '2rem', boxShadow: 'var(--shadow-card)', marginBottom: '1.5rem' }}>
-              <h3 style={{ fontFamily: 'Playfair Display, serif', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><MapPin size={20} color="var(--rose)" /> Delivery Details</h3>
+              <h3 style={{ fontFamily: 'Playfair Display, serif', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><MapPin size={20} color="var(--rose)" /> Delivery & Customer Details</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>Your Name *</label>
+                  <input type="text" className="input-field" placeholder="e.g. John Doe" value={name} onChange={e => setName(e.target.value)} required />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>Mobile / Phone *</label>
+                  <input type="tel" className="input-field" placeholder="e.g. +91 98765 43210" value={phone} onChange={e => setPhone(e.target.value)} required />
+                </div>
+              </div>
               <div style={{ marginBottom: '1rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>Full Address *</label>
-                <textarea className="input-field" rows={3} placeholder="House no, Street, Area, City, PIN" value={address} onChange={e => setAddress(e.target.value)} required style={{ resize: 'none' }} />
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>Full Delivery Address *</label>
+                <textarea className="input-field" rows={3} placeholder="House no, Street, Landmark, Area, City, PIN" value={address} onChange={e => setAddress(e.target.value)} required style={{ resize: 'none' }} />
               </div>
               <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>Order Notes (Optional)</label>
-                <input type="text" className="input-field" placeholder="Allergies, special requests..." value={notes} onChange={e => setNotes(e.target.value)} />
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>Order Notes / Special Requests (Optional)</label>
+                <input type="text" className="input-field" placeholder="Allergies, door bell instructions, message on delivery box..." value={notes} onChange={e => setNotes(e.target.value)} />
               </div>
             </div>
             <div style={{ background: 'white', borderRadius: 'var(--radius-xl)', padding: '2rem', boxShadow: 'var(--shadow-card)' }}>

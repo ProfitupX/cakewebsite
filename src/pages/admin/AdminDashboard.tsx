@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, TrendingDown, AlertTriangle, Sparkles, RefreshCw, Plus, PackageCheck, ChefHat } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertTriangle, Sparkles, RefreshCw, Plus, PackageCheck, ChefHat, Eye, Clock } from 'lucide-react';
 import SalesChart from '../../components/charts/SalesChart';
 import AICakeCalculator from '../../components/cake/AICakeCalculator';
-import { getDashboardKPIs, getSalesData, getOrders, getInventory, deductInventoryForOrder } from '../../lib/database';
+import OrderDetailsModal from '../../components/admin/OrderDetailsModal';
+import { getDashboardKPIs, getSalesData, getOrders, getInventory, deductInventoryForOrder, updateOrderStatus } from '../../lib/database';
 import { predictDemandAndRestockWithAI } from '../../lib/gemini';
 import { aggregateSalesData, computeMovingAverageForecast } from '../../utils/analyticsUtils';
 import { supabase } from '../../lib/supabase';
 import { useAlerts } from '../../context/AlertContext';
-import type { DashboardKPIs, Order, InventoryItem, SalesDataPoint, AIDemandForecastInsight, AICakeCalculation } from '../../types';
+import type { DashboardKPIs, Order, InventoryItem, SalesDataPoint, AIDemandForecastInsight, AICakeCalculation, OrderStatus } from '../../types';
 
 const INITIAL_KPIs: DashboardKPIs = {
   totalRevenue: 0, totalOrders: 0, pendingOrders: 0, lowStockCount: 0, revenueGrowth: 0, ordersGrowth: 0,
@@ -23,6 +24,7 @@ export default function AdminDashboard() {
   const [aiInsight, setAiInsight] = useState<AIDemandForecastInsight | null>(null);
   const [loadingAI, setLoadingAI] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   const { lowStockItems, quickRestock, refreshAlerts } = useAlerts();
 
@@ -312,32 +314,65 @@ export default function AdminDashboard() {
             <tr>
               <th>Order ID</th>
               <th>Customer</th>
+              <th>Baking Time</th>
               <th>Amount</th>
               <th>Status</th>
-              <th>Time</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody>
-            {orders.slice(0, 8).map(order => (
-              <tr key={order.id}>
-                <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>#{order.id.slice(0, 8).toUpperCase()}</td>
-                <td>
-                  <div style={{ fontWeight: 600 }}>{order.profile?.full_name || (order.user_id ? 'Customer' : 'Guest Customer')}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    {order.profile?.email || (order.delivery_address ? `📍 ${order.delivery_address}` : 'Guest Order')}
-                  </div>
-                </td>
-                <td style={{ fontWeight: 700, color: 'var(--rose)' }}>₹{order.total_amount?.toLocaleString()}</td>
-                <td>
-                  <span className={`status-chip status-${order.status}`}>
-                    ● {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                  </span>
-                </td>
-                <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                  {new Date(order.created_at).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}
-                </td>
-              </tr>
-            ))}
+            {orders.slice(0, 8).map(order => {
+              const items = order.items || [];
+              let maxWeight = 1;
+              items.forEach(it => {
+                let w = it.product?.weight_kg || 1;
+                if (it.customization?.size) {
+                  if (it.customization.size.includes('0.5')) w = 0.5;
+                  else if (it.customization.size.includes('2')) w = 2;
+                  else if (it.customization.size.includes('3')) w = 3;
+                }
+                if (w > maxWeight) maxWeight = w;
+              });
+              const bakeTime = Math.round(28 + maxWeight * 10);
+
+              return (
+                <tr 
+                  key={order.id}
+                  onClick={() => setSelectedOrder(order)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <td style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--chocolate)' }}>
+                    #{order.id.slice(0, 8).toUpperCase()}
+                  </td>
+                  <td>
+                    <div style={{ fontWeight: 600 }}>{order.profile?.full_name || (order.user_id ? 'Customer' : 'Guest Customer')}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {order.delivery_address ? `📍 ${order.delivery_address}` : (order.profile?.email || 'Pickup')}
+                    </div>
+                  </td>
+                  <td>
+                    <span className="badge badge-gold" style={{ fontSize: '0.74rem' }}>
+                      <Clock size={11} style={{ marginRight: 3 }} /> {bakeTime} min @ 175°C
+                    </span>
+                  </td>
+                  <td style={{ fontWeight: 800, color: 'var(--rose)' }}>₹{order.total_amount?.toLocaleString()}</td>
+                  <td>
+                    <span className={`status-chip status-${order.status}`}>
+                      ● {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                    </span>
+                  </td>
+                  <td>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setSelectedOrder(order); }}
+                      className="btn btn-sm btn-primary"
+                      style={{ padding: '0.3rem 0.65rem', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                    >
+                      <Eye size={12} /> View Details
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         {orders.length === 0 && (
@@ -347,6 +382,19 @@ export default function AdminDashboard() {
           </div>
         )}
       </div>
+
+      {/* Order Details & AI Kitchen Specs Modal */}
+      {selectedOrder && (
+        <OrderDetailsModal
+          order={selectedOrder}
+          onClose={() => setSelectedOrder(null)}
+          onStatusChange={async (id, status) => {
+            await updateOrderStatus(id, status);
+            await fetchData();
+            setSelectedOrder(prev => prev ? { ...prev, status } : null);
+          }}
+        />
+      )}
     </div>
   );
 }

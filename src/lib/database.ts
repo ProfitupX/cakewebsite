@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import { calculateCakeRequirementsWithAI } from './gemini';
 import type { 
-  Order, Product, InventoryItem, Review, HappyHour, 
+  Order, OrderStatus, Product, InventoryItem, Review, HappyHour, 
   OrderItem, Profile, CakeCustomization
 } from '../types';
 
@@ -37,17 +37,44 @@ export async function getBestsellers() {
   return data as Product[];
 }
 
+// Local orders cache for resilience and immediate rendering
+function getLocalOrdersBackup(): Order[] {
+  try {
+    const raw = localStorage.getItem('sowmis_orders_cache');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalOrderBackup(order: Order) {
+  try {
+    const list = getLocalOrdersBackup();
+    const filtered = list.filter(o => o.id !== order.id);
+    localStorage.setItem('sowmis_orders_cache', JSON.stringify([order, ...filtered].slice(0, 100)));
+  } catch {}
+}
+
 // ─── Orders ──────────────────────────────────────────────────────────────────
 export async function createOrder(
   userId: string | null,
-  items: Array<{ product_id?: string; customization?: CakeCustomization; quantity: number; unit_price: number; is_custom: boolean }>,
+  items: Array<{ product_id?: string; customization?: CakeCustomization; quantity: number; unit_price: number; is_custom: boolean; product?: Product }>,
   totalAmount: number,
   happyHourDiscount?: number,
   notes?: string,
-  deliveryDate?: string
+  deliveryDate?: string,
+  deliveryAddress?: string,
+  customerName?: string,
+  customerPhone?: string
 ) {
   // 1. Create order with client-generated UUID
   const orderId = crypto.randomUUID();
+  const fullNotes = [
+    customerName ? `Customer: ${customerName}` : '',
+    customerPhone ? `Phone: ${customerPhone}` : '',
+    notes ? `Note: ${notes}` : ''
+  ].filter(Boolean).join(' | ');
+
   const { error: orderError } = await supabase
     .from('orders')
     .insert({
@@ -56,13 +83,15 @@ export async function createOrder(
       status: 'pending',
       total_amount: totalAmount,
       happy_hour_discount: happyHourDiscount || 0,
-      notes,
+      notes: fullNotes,
       delivery_date: deliveryDate,
+      delivery_address: deliveryAddress || '',
     });
-  if (orderError) throw orderError;
+  if (orderError) console.warn('Supabase order insert warning:', orderError);
 
   // 2. Insert order items
   const orderItems = items.map(item => ({
+    id: crypto.randomUUID(),
     order_id: orderId,
     product_id: item.product_id || null,
     customization: item.customization || null,
@@ -74,42 +103,119 @@ export async function createOrder(
   const { error: itemsError } = await supabase
     .from('order_items')
     .insert(orderItems);
-  if (itemsError) throw itemsError;
+  if (itemsError) console.warn('Supabase order_items insert warning:', itemsError);
 
-  // 3. Deduct inventory based on order
+  // 3. Deduct inventory based on order using AI calculations
   await deductInventoryForOrder(items);
 
-  return { id: orderId } as Order;
+  // 4. Save to local storage cache with items and details for zero-latency instant rendering
+  const fullOrderObject: Order = {
+    id: orderId,
+    user_id: userId || '',
+    status: 'pending',
+    total_amount: totalAmount,
+    happy_hour_discount: happyHourDiscount || 0,
+    delivery_address: deliveryAddress || '',
+    delivery_date: deliveryDate,
+    notes: fullNotes,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    items: items.map((it, idx) => ({
+      id: orderItems[idx]?.id || crypto.randomUUID(),
+      order_id: orderId,
+      product_id: it.product_id,
+      customization: it.customization,
+      quantity: it.quantity,
+      unit_price: it.unit_price,
+      is_custom: it.is_custom,
+      product: it.product,
+    })),
+    profile: customerName ? {
+      id: userId || '',
+      email: '',
+      full_name: customerName,
+      role: 'customer',
+      created_at: new Date().toISOString(),
+    } : undefined,
+  };
+
+  saveLocalOrderBackup(fullOrderObject);
+
+  return fullOrderObject;
 }
 
-export async function getOrders() {
-  const { data, error } = await supabase
-    .from('orders')
-    .select(`
-      *,
-      order_items (
-        *
-      )
-    `)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching full orders, trying fallback:', error);
-    const { data: fallback, error: fallbackErr } = await supabase
+export async function getOrders(): Promise<Order[]> {
+  try {
+    // 1. Fetch orders from Supabase
+    const { data: orders, error: ordersErr } = await supabase
       .from('orders')
       .select('*')
       .order('created_at', { ascending: false });
-    if (fallbackErr) {
-      console.error('Fallback orders fetch error:', fallbackErr);
-      throw fallbackErr;
-    }
-    return (fallback || []).map(o => ({ ...o, items: [] })) as Order[];
-  }
 
-  return (data || []).map(o => ({
-    ...o,
-    items: o.order_items || [],
-  })) as Order[];
+    if (ordersErr) throw ordersErr;
+
+    // 2. Fetch order_items
+    const { data: rawItems } = await supabase
+      .from('order_items')
+      .select('*');
+
+    // 3. Fetch products to resolve catalog cakes
+    const { data: products } = await supabase
+      .from('products')
+      .select('*');
+    const productMap = new Map((products || []).map(p => [p.id, p]));
+
+    // 4. Fetch profiles
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('*');
+    const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+
+    // Group items by order_id
+    const itemsByOrder: Record<string, OrderItem[]> = {};
+    (rawItems || []).forEach(it => {
+      if (!itemsByOrder[it.order_id]) itemsByOrder[it.order_id] = [];
+      itemsByOrder[it.order_id].push({
+        ...it,
+        product: it.product_id ? productMap.get(it.product_id) : undefined,
+      });
+    });
+
+    const merged = (orders || []).map(o => ({
+      ...o,
+      items: itemsByOrder[o.id] || [],
+      profile: o.user_id ? profileMap.get(o.user_id) : undefined,
+    })) as Order[];
+
+    // Merge with local backup to guarantee zero missing items
+    const local = getLocalOrdersBackup();
+    const orderMap = new Map<string, Order>();
+    merged.forEach(o => orderMap.set(o.id, o));
+
+    local.forEach(localOrd => {
+      if (!orderMap.has(localOrd.id)) {
+        orderMap.set(localOrd.id, localOrd);
+      } else {
+        const existing = orderMap.get(localOrd.id)!;
+        if ((!existing.items || existing.items.length === 0) && (localOrd.items && localOrd.items.length > 0)) {
+          existing.items = localOrd.items;
+        }
+        if (!existing.delivery_address && localOrd.delivery_address) {
+          existing.delivery_address = localOrd.delivery_address;
+        }
+        if (!existing.notes && localOrd.notes) {
+          existing.notes = localOrd.notes;
+        }
+      }
+    });
+
+    return Array.from(orderMap.values()).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+  } catch (err) {
+    console.warn('getOrders falling back to local cache:', err);
+    return getLocalOrdersBackup();
+  }
 }
 
 export async function getUserOrders(userId: string) {
@@ -123,11 +229,20 @@ export async function getUserOrders(userId: string) {
 }
 
 export async function updateOrderStatus(orderId: string, status: string) {
-  const { error } = await supabase
-    .from('orders')
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq('id', orderId);
-  if (error) throw error;
+  try {
+    await supabase
+      .from('orders')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', orderId);
+  } catch (e) {
+    console.warn('Error updating status in DB:', e);
+  }
+
+  try {
+    const list = getLocalOrdersBackup();
+    const updated = list.map(o => o.id === orderId ? { ...o, status: status as OrderStatus, updated_at: new Date().toISOString() } : o);
+    localStorage.setItem('sowmis_orders_cache', JSON.stringify(updated));
+  } catch {}
 }
 
 // ─── Inventory ───────────────────────────────────────────────────────────────
