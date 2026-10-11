@@ -213,20 +213,21 @@ export function getAlgorithmicCakeCalculation(params: {
   const sugarKg = Number((0.28 * w).toFixed(2));
   const butterKg = Number((0.22 * w).toFixed(2));
   const eggsCount = Math.round(3.5 * w);
+  const eggsDozen = Number((eggsCount / 12).toFixed(2));
   const milkL = Number((0.18 * w).toFixed(2));
   const cocoaKg = isChoco ? Number((0.08 * w).toFixed(2)) : (isRedVelvet ? Number((0.03 * w).toFixed(2)) : 0);
   const vanillaMl = Math.round(10 * w);
-  const bakingPowderG = Number((0.015 * w).toFixed(3));
+  const bakingPowderKg = Number((0.015 * w).toFixed(3)); // 15g = 0.015kg matching DB unit
 
   const ingredients: AIIngredientRequirement[] = [
     { name: 'All-Purpose Flour', amount: flourKg, unit: 'kg', inventory_match: 'All-Purpose Flour', cost_estimate: Math.round(flourKg * 45) },
     { name: 'Granulated Sugar', amount: sugarKg, unit: 'kg', inventory_match: 'Granulated Sugar', cost_estimate: Math.round(sugarKg * 55) },
     { name: 'Unsalted Butter', amount: butterKg, unit: 'kg', inventory_match: 'Unsalted Butter', cost_estimate: Math.round(butterKg * 480) },
-    { name: 'Fresh Eggs', amount: Math.ceil(eggsCount / 12), unit: 'dozen', inventory_match: 'Fresh Eggs', cost_estimate: Math.round((eggsCount / 12) * 90) },
+    { name: 'Fresh Eggs', amount: eggsDozen, unit: 'dozen', inventory_match: 'Fresh Eggs', cost_estimate: Math.round(eggsDozen * 90) },
     { name: 'Fresh Milk', amount: milkL, unit: 'litre', inventory_match: 'Fresh Milk', cost_estimate: Math.round(milkL * 60) },
     ...(cocoaKg > 0 ? [{ name: 'Cocoa Powder', amount: cocoaKg, unit: 'kg', inventory_match: 'Cocoa Powder', cost_estimate: Math.round(cocoaKg * 850) }] : []),
     { name: 'Vanilla Extract', amount: vanillaMl, unit: 'ml', inventory_match: 'Vanilla Extract', cost_estimate: Math.round(vanillaMl * 2) },
-    { name: 'Baking Powder', amount: Number((bakingPowderG * 1000).toFixed(1)), unit: 'g', inventory_match: 'Baking Powder', cost_estimate: 15 },
+    { name: 'Baking Powder', amount: bakingPowderKg, unit: 'kg', inventory_match: 'Baking Powder', cost_estimate: 15 },
   ];
 
   const totalRawCost = ingredients.reduce((sum, item) => sum + item.cost_estimate, 0);

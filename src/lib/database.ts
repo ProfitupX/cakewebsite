@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { calculateCakeRequirementsWithAI } from './gemini';
+import { calculateCakeRequirementsWithAI, getAlgorithmicCakeCalculation } from './gemini';
 import type { 
   Order, OrderStatus, Product, InventoryItem, Review, HappyHour, 
   OrderItem, Profile, CakeCustomization
@@ -263,9 +263,9 @@ export async function updateInventoryStock(id: string, newStock: number) {
   if (error) throw error;
 }
 
-// Auto-deduct ingredients using AI calculation when order is placed
+// Auto-deduct ingredients using exact cake recipe calculations when order is placed
 export async function deductInventoryForOrder(
-  items: Array<{ product_id?: string; customization?: CakeCustomization; quantity: number; is_custom: boolean }>
+  items: Array<{ product_id?: string; customization?: CakeCustomization; quantity: number; is_custom: boolean; product?: Product }>
 ) {
   try {
     const { data: inventory, error: invError } = await supabase.from('inventory').select('*');
@@ -278,8 +278,8 @@ export async function deductInventoryForOrder(
     const totalDeductions: Record<string, number> = {};
 
     for (const item of items) {
-      let cakeName = 'Custom Cake';
-      let weightKg = 1;
+      let cakeName = item.product?.name || (item.is_custom ? 'Custom 3D Cake' : 'Artisan Cake');
+      let weightKg = item.product?.weight_kg || 1;
       let flavor = 'Vanilla';
       let tiers = 1;
       let frosting = 'Buttercream';
@@ -300,8 +300,12 @@ export async function deductInventoryForOrder(
         };
         weightKg = sizeMap[item.customization.size] || 1;
         cakeName = `${flavor} Cake (${item.customization.size})`;
+      } else if (item.product) {
+        cakeName = item.product.name;
+        weightKg = item.product.weight_kg || 1;
+        flavor = item.product.name.includes('Chocolate') ? 'Chocolate' : (item.product.name.includes('Velvet') ? 'RedVelvet' : (item.product.name.includes('Mango') ? 'Mango' : (item.product.name.includes('Lemon') ? 'Lemon' : (item.product.name.includes('Strawberry') ? 'Strawberry' : 'Vanilla'))));
       } else if (item.product_id) {
-        // Query or match catalog product name
+        // Query catalog product name if not preloaded
         const { data: prod } = await supabase.from('products').select('*').eq('id', item.product_id).single();
         if (prod) {
           cakeName = prod.name;
@@ -310,8 +314,8 @@ export async function deductInventoryForOrder(
         }
       }
 
-      // Calculate AI requirements for this cake
-      const calculation = await calculateCakeRequirementsWithAI({
+      // Calculate instant deterministic requirements for guaranteed, zero-latency deduction
+      const calculation = getAlgorithmicCakeCalculation({
         cake_name: cakeName,
         weight_kg: weightKg * item.quantity,
         tiers,
@@ -324,19 +328,20 @@ export async function deductInventoryForOrder(
       // Aggregate required amounts to database inventory items
       calculation.ingredients.forEach(ing => {
         const matchName = ing.inventory_match || ing.name;
-        totalDeductions[matchName] = (totalDeductions[matchName] || 0) + ing.amount;
+        totalDeductions[matchName] = Number(((totalDeductions[matchName] || 0) + ing.amount).toFixed(3));
       });
     }
+
+    console.log('[INVENTORY DEDUCTION] Deducting ingredients from Supabase DB:', totalDeductions);
 
     // Apply exact deductions to Supabase inventory table
     for (const invItem of inventory) {
       let amountToDeduct = 0;
 
-      // Exact match or fuzzy match
-      if (totalDeductions[invItem.name]) {
+      // Exact match or keyword match
+      if (totalDeductions[invItem.name] !== undefined) {
         amountToDeduct = totalDeductions[invItem.name];
       } else {
-        // Keyword fallback
         const lower = invItem.name.toLowerCase();
         if (lower.includes('flour') && totalDeductions['All-Purpose Flour']) amountToDeduct = totalDeductions['All-Purpose Flour'];
         else if (lower.includes('sugar') && totalDeductions['Granulated Sugar']) amountToDeduct = totalDeductions['Granulated Sugar'];
@@ -345,19 +350,50 @@ export async function deductInventoryForOrder(
         else if (lower.includes('milk') && totalDeductions['Fresh Milk']) amountToDeduct = totalDeductions['Fresh Milk'];
         else if (lower.includes('cocoa') && totalDeductions['Cocoa Powder']) amountToDeduct = totalDeductions['Cocoa Powder'];
         else if (lower.includes('vanilla') && totalDeductions['Vanilla Extract']) amountToDeduct = totalDeductions['Vanilla Extract'];
-        else if (lower.includes('baking powder') && totalDeductions['Baking Powder']) amountToDeduct = totalDeductions['Baking Powder'] / 1000; // grams to kg if needed
+        else if (lower.includes('baking powder') && totalDeductions['Baking Powder']) amountToDeduct = totalDeductions['Baking Powder'];
       }
 
       if (amountToDeduct > 0) {
         const newStock = Number(Math.max(0, invItem.current_stock - amountToDeduct).toFixed(2));
-        await supabase
+        const { error: updErr } = await supabase
           .from('inventory')
           .update({ current_stock: newStock, updated_at: new Date().toISOString() })
           .eq('id', invItem.id);
+        
+        if (updErr) {
+          console.warn(`Failed to deduct ${invItem.name} in DB:`, updErr);
+        } else {
+          console.log(`[DB UPDATED] ${invItem.name}: ${invItem.current_stock} -> ${newStock} ${invItem.unit}`);
+        }
       }
     }
   } catch (err) {
-    console.error('Error during AI inventory deduction:', err);
+    console.error('Error during live inventory deduction:', err);
+  }
+}
+
+export async function resetInventoryToHealthyStock() {
+  const defaultItems = [
+    { name: 'All-Purpose Flour', current_stock: 45, min_threshold: 5, max_capacity: 50, unit: 'kg' },
+    { name: 'Granulated Sugar', current_stock: 35, min_threshold: 5, max_capacity: 40, unit: 'kg' },
+    { name: 'Unsalted Butter', current_stock: 18, min_threshold: 3, max_capacity: 20, unit: 'kg' },
+    { name: 'Fresh Eggs', current_stock: 25, min_threshold: 5, max_capacity: 30, unit: 'dozen' },
+    { name: 'Fresh Milk', current_stock: 32, min_threshold: 8, max_capacity: 40, unit: 'litre' },
+    { name: 'Cocoa Powder', current_stock: 7.5, min_threshold: 2, max_capacity: 10, unit: 'kg' },
+    { name: 'Vanilla Extract', current_stock: 750, min_threshold: 200, max_capacity: 1000, unit: 'ml' },
+    { name: 'Baking Powder', current_stock: 3.5, min_threshold: 1, max_capacity: 5, unit: 'kg' }
+  ];
+
+  for (const it of defaultItems) {
+    await supabase
+      .from('inventory')
+      .update({
+        current_stock: it.current_stock,
+        min_threshold: it.min_threshold,
+        max_capacity: it.max_capacity,
+        updated_at: new Date().toISOString()
+      })
+      .eq('name', it.name);
   }
 }
 
